@@ -16,7 +16,7 @@ function AssignmentCard({ assignment }: { assignment: Assignment }) {
   return (
     <Link
       key={assignment.id}
-      className="assignments-link "
+      className="assignments-link"
       href={`/assignment/${assignment.id}`}
     >
       <Box width="100%">

@@ -1,12 +1,14 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
 import SelectMenu from '@/components/select-menu/selectmenu';
 import { SubjectOptions, Biology, History, SubjectOption } from '@/components/select-menu/data';
 import { MentionsInput, Mention, SuggestionDataItem } from 'react-mentions';
-import { ModeToggle } from "@/components/dark-mode-toggle";
-import { ThemeProvider } from "@/components/theme-provider";
+import { Container, Flex, Heading } from "@radix-ui/themes";
+import styles from "./page.module.css";
+import { CaretRightIcon, CaretLeftIcon } from "@radix-ui/react-icons";
+import React from "react";
 
 interface Assignment {
   id: number;
@@ -28,13 +30,11 @@ export default function AssignmentListPage() {
   const [additionalPrompt, setAdditionalPrompt] = useState("");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
-  const [editingAssignmentId, setEditingAssignmentId] = useState<number | null>(
-    null
-  );
+  const [editingAssignmentId, setEditingAssignmentId] = useState<number | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [selectedSubject, setSelectedSubject] = useState<SubjectOption | null>(null);
+  const [scrollStates, setScrollStates] = useState<{ [subject: string]: { showScrollButtons: boolean } }>({});
 
-  // Fetch all assignments
   useEffect(() => {
     fetch("/api/assignment")
       .then((res) => res.json())
@@ -42,23 +42,48 @@ export default function AssignmentListPage() {
       .catch((err) => console.error("Error fetching assignments", err));
   }, []);
 
-  // Process template tags into full template texts
+  const groupedAssignments = useMemo(() => {
+    return assignments.reduce((acc, assignment) => {
+      const subj = assignment.subject;
+      if (!acc[subj]) acc[subj] = [];
+      acc[subj].push(assignment);
+      return acc;
+    }, {} as { [key: string]: Assignment[] });
+  }, [assignments]);
+
+  // Instead of using useRef in a loop, we use createRef which is not a hook.
+  const rowRefs = useMemo(() => {
+    const refs: { [subject: string]: React.RefObject<HTMLDivElement> } = {};
+    for (const subj of Object.keys(groupedAssignments)) {
+      refs[subj] = React.createRef<HTMLDivElement>();
+    }
+    return refs;
+  }, [groupedAssignments]);
+
+  useEffect(() => {
+    // Check scroll states once refs and assignments are known
+    const newScrollStates: { [subject: string]: { showScrollButtons: boolean } } = {};
+    for (const subj of Object.keys(groupedAssignments)) {
+      const element = rowRefs[subj].current;
+      if (element) {
+        const overflow = element.scrollWidth > element.clientWidth;
+        newScrollStates[subj] = { showScrollButtons: overflow };
+      }
+    }
+    setScrollStates(newScrollStates);
+  }, [assignments, groupedAssignments, rowRefs]);
+
   const processTemplateText = (text: string) => {
     const templateMap: { [key: string]: string } = {
       'biology-prompt': Biology,
       'history-prompt': History,
-      // Add more templates as needed
     };
-
-    // Replace mentions with actual template content
     return text.replace(/@\[([^\]]+)\]\(([^)]+)\)/g, (match, display, id) => {
       return templateMap[id] || match;
     });
   };
 
-  // Handle subject change
   const handleSubjectChange = (selectedOption: SubjectOption | null) => {
-    // Check if current subject is 'Custom' and user is changing to a different subject
     if (
       subject === 'Custom' &&
       selectedOption &&
@@ -67,14 +92,8 @@ export default function AssignmentListPage() {
       const confirmChange = window.confirm(
         'Changing the subject will reset your additional prompt. Do you want to proceed?'
       );
-
-      if (!confirmChange) {
-        // User canceled, do not update the subject
-        return;
-      } else {
-        // Reset the additionalPrompt
-        setAdditionalPrompt('');
-      }
+      if (!confirmChange) return;
+      setAdditionalPrompt('');
     }
 
     setSelectedSubject(selectedOption);
@@ -82,29 +101,24 @@ export default function AssignmentListPage() {
 
     if (selectedOption) {
       if (selectedOption.value === 'Biology') {
-        // Set the Additional Prompt to the mention tag for Biology
         setAdditionalPrompt(`@[biology-prompt](biology-prompt)`);
       } else if (selectedOption.value === 'History') {
-        // Set the Additional Prompt to the mention tag for History
         setAdditionalPrompt(`@[history-prompt](history-prompt)`);
       } else if (selectedOption.value === 'Custom') {
-        setAdditionalPrompt(''); // Leave empty for custom input
+        setAdditionalPrompt('');
       }
     } else {
       setAdditionalPrompt('');
     }
   };
 
-  // Handle form submission to add or edit an assignment
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-
     if (!title || !subject || !learningOutcomes || !markingCriteria) {
       setErrorMessage("Please fill in all fields");
       return;
     }
 
-    // Show a warning if using Custom subject with mention tags
     if (
       selectedSubject?.value === 'Custom' &&
       /@\[([^\]]+)\]\(([^)]+)\)/g.test(additionalPrompt)
@@ -123,11 +137,8 @@ export default function AssignmentListPage() {
     }
 
     try {
-      const url = editingAssignmentId
-        ? `/api/assignment/${editingAssignmentId}`
-        : "/api/assignment";
+      const url = editingAssignmentId ? `/api/assignment/${editingAssignmentId}` : "/api/assignment";
       const method = editingAssignmentId ? "PUT" : "POST";
-
       const response = await fetch(url, {
         method,
         headers: {
@@ -138,7 +149,7 @@ export default function AssignmentListPage() {
           subject,
           learningOutcomes,
           markingCriteria,
-          additionalPrompt, // Save the additionalPrompt as-is
+          additionalPrompt,
         }),
       });
 
@@ -147,9 +158,7 @@ export default function AssignmentListPage() {
         if (editingAssignmentId) {
           setAssignments(
             assignments.map((assignment) =>
-              assignment.id === editingAssignmentId
-                ? savedAssignment
-                : assignment
+              assignment.id === editingAssignmentId ? savedAssignment : assignment
             )
           );
           setSuccessMessage("Assignment updated successfully!");
@@ -178,7 +187,6 @@ export default function AssignmentListPage() {
     setSelectedSubject(null);
   };
 
-  // Handle edit action
   const handleEdit = (assignment: Assignment) => {
     setTitle(assignment.title);
     setSubject(assignment.subject);
@@ -192,13 +200,11 @@ export default function AssignmentListPage() {
     setSelectedSubject(selectedOption || null);
   };
 
-  // Handle add action
   const handleAdd = () => {
     resetForm();
     setShowForm(true);
   };
 
-  // Handle delete action
   const handleDelete = async (id: number) => {
     try {
       const response = await fetch(`/api/assignment/${id}`, {
@@ -206,9 +212,7 @@ export default function AssignmentListPage() {
       });
 
       if (response.ok) {
-        setAssignments(
-          assignments.filter((assignment) => assignment.id !== id)
-        );
+        setAssignments(assignments.filter((assignment) => assignment.id !== id));
         setSuccessMessage("Assignment deleted successfully!");
       } else {
         setErrorMessage("Failed to delete assignment");
@@ -218,17 +222,52 @@ export default function AssignmentListPage() {
     }
   };
 
-  // Mention data
+  function AssignmentCard({ assignment }: { assignment: Assignment }) {
+    return (
+      <div className={styles.assignmentCard}>
+        <div className={styles.customCard}>
+          <div className={styles.customAvatar}>
+            {assignment.subject[0] || "A"}
+          </div>
+          <div className={styles.cardContent}>
+            <div className={styles.cardTitle}>{assignment.title}</div>
+            <div className={styles.cardSubtitle}>
+              Updated {new Date(assignment.updatedAt).toDateString()}
+            </div>
+          </div>
+          <div className={styles.cardActions}>
+            <button
+              onClick={() => handleEdit(assignment)}
+              className={styles.editButton}
+            >
+              Edit
+            </button>
+            <button
+              onClick={() => handleDelete(assignment.id)}
+              className={styles.deleteButton}
+            >
+              Delete
+            </button>
+            <a
+              className={styles.assignmentsLink}
+              href={`/admin/assignment/${assignment.id}`}
+            >
+              View Details
+            </a>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   const mentionData: SuggestionDataItem[] = [
     { id: 'biology-prompt', display: 'biology-prompt' },
     { id: 'history-prompt', display: 'history-prompt' },
-    // Add more mention tags as needed
   ];
 
-  // Custom render function for the mentions
   const renderMentions = (text: string) => {
     const regex = /@\[([^\]]+)\]\(([^)]+)\)/g;
-    const parts = [];
+    const parts: (string | JSX.Element)[] = [];
     let lastIndex = 0;
     let match;
     while ((match = regex.exec(text)) !== null) {
@@ -250,6 +289,20 @@ export default function AssignmentListPage() {
     return parts;
   };
 
+  const scrollLeft = (subj: string) => {
+    const ref = rowRefs[subj].current;
+    if (ref) {
+      ref.scrollBy({ top: 0, left: -300, behavior: 'smooth' });
+    }
+  };
+
+  const scrollRight = (subj: string) => {
+    const ref = rowRefs[subj].current;
+    if (ref) {
+      ref.scrollBy({ top: 0, left: 300, behavior: 'smooth' });
+    }
+  };
+
   return (
     <div className="assignment-page">
       <div className="assignment-container">
@@ -257,66 +310,50 @@ export default function AssignmentListPage() {
           <div className="assignment-list">
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <Link href="/">
-              <h1 style={{ cursor: "pointer" }}>Home</h1>
+                <h1 style={{ cursor: "pointer" }}>Home</h1>
               </Link>
-              <ThemeProvider>
-              <ModeToggle />
-              </ThemeProvider>
             </div>
-            <h2>Assignment List</h2>
-            <ul>
-              {assignments.map((assignment) => (
-                <li key={assignment.id} className="assignment-item">
-                  <p>
-                    <strong>Title:</strong> {assignment.title}
-                  </p>
-                  <p>
-                    <strong>Subject:</strong> {assignment.subject}
-                  </p>
-                  <p>
-                    <strong>Learning Outcomes:</strong>
-                  </p>
-                  <pre style={{ whiteSpace: "pre-wrap" }}>
-                    {assignment.learningOutcomes}
-                  </pre>
-                  <p>
-                    <strong>Marking Criteria:</strong>
-                  </p>
-                  <pre style={{ whiteSpace: "pre-wrap" }}>
-                    {assignment.markingCriteria}
-                  </pre>
-                  <p>
-                    <strong>Additional Prompt:</strong>
-                  </p>
-                  <div className="mentions read-only">
-                    {renderMentions(assignment.additionalPrompt)}
+            <Container className="p-8">
+              <Heading as="h1" className="mb-4">
+                Assignment List
+              </Heading>
+              {Object.entries(groupedAssignments).map(([subj, subjectAssignments]) => {
+                const { showScrollButtons = false } = scrollStates[subj] || {};
+                return (
+                  <div key={subj} className={styles.subjectSection}>
+                    <Heading as="h2" size="5" className={styles.subjectHeading}>{subj}</Heading>
+                    <div className={styles.cardRowContainer}>
+                      {showScrollButtons && (
+                        <button 
+                          className={styles.scrollButtonLeft} 
+                          onClick={() => scrollLeft(subj)}
+                          aria-label="Scroll left"
+                        >
+                          <CaretLeftIcon />
+                        </button>
+                      )}
+                      <Flex className={styles.cardRow} ref={rowRefs[subj]}>
+                        {subjectAssignments.map((assignment) => (
+                          <AssignmentCard key={assignment.id} assignment={assignment} />
+                        ))}
+                      </Flex>
+                      {showScrollButtons && (
+                        <button 
+                          className={styles.scrollButtonRight} 
+                          onClick={() => scrollRight(subj)}
+                          aria-label="Scroll right"
+                        >
+                          <CaretRightIcon />
+                        </button>
+                      )}
+                    </div>
                   </div>
-                  <button
-                    onClick={() => handleEdit(assignment)}
-                    className="edit-button"
-                  >
-                    Edit
-                  </button>
-                  <button
-                    onClick={() => handleDelete(assignment.id)}
-                    className="delete-button"
-                  >
-                    Delete
-                  </button>
-                  <div>
-                    <Link
-                      className="assignments-link"
-                      href={`/admin/assignment/${assignment.id}`}
-                    >
-                      View Details
-                    </Link>
-                  </div>
-                </li>
-              ))}
-            </ul>
-            <button onClick={handleAdd} className="add-button">
-              Add New Assignment
-            </button>
+                );
+              })}
+              <button onClick={handleAdd} className="add-button">
+                Add New Assignment
+              </button>
+            </Container>
           </div>
         ) : (
           <div className="assignment-form">
