@@ -6,8 +6,18 @@ import { RocketIcon } from "@radix-ui/react-icons";
 import { TabNav } from "@radix-ui/themes";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useState, useEffect } from "react";
 export function Header() {
   const local = usePathname();
+  const [isMounted, setIsMounted] = useState(false);
+
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
+
+  if (!isMounted) {
+    return null;
+  }
 
   return (
     <TabNav.Root className="px-4 items-center">
@@ -18,17 +28,15 @@ export function Header() {
         </Link>
       </li>
 
-      <TabNav.Link active={local.indexOf("/admin") === -1}>
+      <TabNav.Link asChild active={local.indexOf("/admin") === -1}>
         <Link href="/assignments">Students</Link>
       </TabNav.Link>
-      <TabNav.Link href="#" active={local.indexOf("/admin") !== -1}>
+      <TabNav.Link asChild active={local.indexOf("/admin") !== -1}>
         <Link href="/admin/assignments">Teachers</Link>
       </TabNav.Link>
       <div style={{ flex: 1 }}></div>
       <li className="self-center">
-        <ThemeProvider>
-          <ModeToggle />
-        </ThemeProvider>
+        <ModeToggle />
       </li>
     </TabNav.Root>
   );

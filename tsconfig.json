@@ -32,6 +32,6 @@
     "src/app/signin/[[...sign-in]]/page.tsc",
     "src/app/signup/[[...sign-up]]/page.tsc",
     "src/app/api/upload/uploadfile.tsc"
-  ],
+, "src/app/admin/assignment/[id]/page.tsc"  ],
   "exclude": ["node_modules"]
 }

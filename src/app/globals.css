@@ -722,15 +722,6 @@ input {
   color: #000;
 }
 
-.mentions.read-only {
-  color: #999;
-  overflow-y: auto;
-}
-
-.dark .mentions.read-only {
-  background-color: #57595a;
-  color: white;
-}
 
 .dark .mentions__mention {
   background-color: #9bb2c9;

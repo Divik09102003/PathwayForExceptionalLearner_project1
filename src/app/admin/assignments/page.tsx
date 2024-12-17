@@ -1,14 +1,21 @@
 "use client";
-
+import styles from "./page.module.css";
 import { useState, useEffect, useMemo } from "react";
-import Link from "next/link";
 import SelectMenu from '@/components/select-menu/selectmenu';
 import { SubjectOptions, Biology, History, SubjectOption } from '@/components/select-menu/data';
 import { MentionsInput, Mention, SuggestionDataItem } from 'react-mentions';
 import { Container, Flex, Heading } from "@radix-ui/themes";
-import styles from "./page.module.css";
 import { CaretRightIcon, CaretLeftIcon } from "@radix-ui/react-icons";
 import React from "react";
+import { usePathname } from "next/navigation";
+import {
+  Breadcrumb,
+  BreadcrumbItem,
+  BreadcrumbLink,
+  BreadcrumbList,
+  BreadcrumbPage,
+  BreadcrumbSeparator,
+} from "@/components/ui/breadcrumb";
 
 interface Assignment {
   id: number;
@@ -51,7 +58,6 @@ export default function AssignmentListPage() {
     }, {} as { [key: string]: Assignment[] });
   }, [assignments]);
 
-  // Instead of using useRef in a loop, we use createRef which is not a hook.
   const rowRefs = useMemo(() => {
     const refs: { [subject: string]: React.RefObject<HTMLDivElement> } = {};
     for (const subj of Object.keys(groupedAssignments)) {
@@ -61,7 +67,6 @@ export default function AssignmentListPage() {
   }, [groupedAssignments]);
 
   useEffect(() => {
-    // Check scroll states once refs and assignments are known
     const newScrollStates: { [subject: string]: { showScrollButtons: boolean } } = {};
     for (const subj of Object.keys(groupedAssignments)) {
       const element = rowRefs[subj].current;
@@ -277,7 +282,7 @@ export default function AssignmentListPage() {
         parts.push(text.substring(lastIndex, start));
       }
       parts.push(
-        <span key={start} className="mentions__mention">
+        <span key={start} className={styles.mentionsMention}>
           {match[1]}
         </span>
       );
@@ -304,14 +309,26 @@ export default function AssignmentListPage() {
   };
 
   return (
-    <div className="assignment-page">
-      <div className="assignment-container">
+    <div className={styles.assignmentPage}>
+      <div className={styles.assignmentContainer}>
         {!showForm ? (
-          <div className="assignment-list">
+          <div className={styles.assignmentList}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <Link href="/">
-                <h1 style={{ cursor: "pointer" }}>Home</h1>
-              </Link>
+              {/* <Link href="/">
+                <h1 style={{ cursor: "pointer", fontSize: "1.5rem", marginBottom: "1rem" }}>Home</h1>
+              </Link> */}
+              {/* Breadcrumb */}
+            <Breadcrumb>
+              <BreadcrumbList>
+                <BreadcrumbItem>
+                  <BreadcrumbLink href="/">Home</BreadcrumbLink>
+                </BreadcrumbItem>
+                <BreadcrumbSeparator />
+                <BreadcrumbItem>
+                  <BreadcrumbPage>Teachers</BreadcrumbPage>
+                </BreadcrumbItem>
+              </BreadcrumbList>
+            </Breadcrumb>
             </div>
             <Container className="p-8">
               <Heading as="h1" className="mb-4">
@@ -321,7 +338,7 @@ export default function AssignmentListPage() {
                 const { showScrollButtons = false } = scrollStates[subj] || {};
                 return (
                   <div key={subj} className={styles.subjectSection}>
-                    <Heading as="h2" size="5" className={styles.subjectHeading}>{subj}</Heading>
+                    <Heading as="h2" size="5" className="subjectHeading">{subj}</Heading>
                     <div className={styles.cardRowContainer}>
                       {showScrollButtons && (
                         <button 
@@ -329,7 +346,7 @@ export default function AssignmentListPage() {
                           onClick={() => scrollLeft(subj)}
                           aria-label="Scroll left"
                         >
-                          <CaretLeftIcon />
+                          <CaretLeftIcon style={{ color: '#000', width: '24px', height: '24px', stroke: 'currentColor', strokeWidth: 1 }} />
                         </button>
                       )}
                       <Flex className={styles.cardRow} ref={rowRefs[subj]}>
@@ -343,67 +360,72 @@ export default function AssignmentListPage() {
                           onClick={() => scrollRight(subj)}
                           aria-label="Scroll right"
                         >
-                          <CaretRightIcon />
+                          <CaretRightIcon style={{ color: '#000', width: '24px', height: '24px', stroke: 'currentColor', strokeWidth: 1 }} />
                         </button>
                       )}
                     </div>
                   </div>
                 );
               })}
-              <button onClick={handleAdd} className="add-button">
+              <button onClick={handleAdd} className={styles.addButton}>
                 Add New Assignment
               </button>
             </Container>
           </div>
         ) : (
-          <div className="assignment-form">
+          <div className={styles.assignmentForm}>
             <h3>
               {editingAssignmentId ? "Edit Assignment" : "Add New Assignment"}
             </h3>
-            {errorMessage && <p className="error-message">{errorMessage}</p>}
+            {errorMessage && <p className={styles.errorMessage}>{errorMessage}</p>}
             {successMessage && (
-              <p className="success-message">{successMessage}</p>
+              <p className={styles.successMessage}>{successMessage}</p>
             )}
             <form onSubmit={handleSubmit}>
-              <div className="form-group">
-                <label>Title:</label>
+              <div className={styles.formGroup}>
+                <label className={styles.labels}>Title:</label>
                 <input
                   type="text"
+                  className={styles.input}
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
                   required
                 />
               </div>
-              <div className="form-group">
-                <label>Learning Outcomes:</label>
+              <div className={styles.formGroup}>
+                <label className={styles.labels}>Learning Outcomes:</label>
                 <textarea
+                  className={styles.textarea}
                   value={learningOutcomes}
                   onChange={(e) => setLearningOutcomes(e.target.value)}
                   required
                   rows={4}
                 />
               </div>
-              <div className="form-group">
-                <label>Marking Criteria:</label>
+              <div className={styles.formGroup}>
+                <label className={styles.labels}>Marking Criteria:</label>
                 <textarea
+                  className={styles.textarea}
                   value={markingCriteria}
                   onChange={(e) => setMarkingCriteria(e.target.value)}
                   required
                   rows={4}
                 />
               </div>
-              <div className="form-group">
-                <label>Subject:</label>
-                <SelectMenu onChange={handleSubjectChange} value={selectedSubject} />
+              <div className={styles.formGroup}>
+                <label className={styles.labels}>Subject:</label>
+                <div className={styles.selectMenuContainer}>
+                  <SelectMenu onChange={handleSubjectChange} value={selectedSubject} />
+                </div>
               </div>
-              <div className="form-group">
-                <label>Additional Prompt:</label>
+              <div className={styles.formGroup}>
+                <label className={styles.labels}>Additional Prompt:</label>
                 {selectedSubject?.value === 'Custom' ? (
                   <MentionsInput
                     value={additionalPrompt}
                     onChange={(event, newValue) => setAdditionalPrompt(newValue)}
                     placeholder="Type '@' to select a prompt..."
-                    className="mentions"
+                    className={styles.mentions}
                     allowSuggestionsAboveCursor={true}
                     style={{ height: '200px' }}
                     singleLine={false}
@@ -414,25 +436,25 @@ export default function AssignmentListPage() {
                       markup="@[$__display__]($__id__)"
                       appendSpaceOnAdd={true}
                       renderSuggestion={(suggestion, search, highlightedDisplay, index, focused) => (
-                        <div className={`suggestion-item ${focused ? 'focused' : ''}`}>
+                        <div className={`${styles.suggestionItem} ${focused ? styles.focused : ''}`}>
                           {highlightedDisplay}
                         </div>
                       )}
                     />
                   </MentionsInput>
                 ) : (
-                  <div className="mentions read-only">
+                  <div className={`${styles.mentions} ${styles.readOnly}`}>
                     {renderMentions(additionalPrompt)}
                   </div>
                 )}
               </div>
-              <button type="submit">
+              <button type="submit" className={styles.submitButton}>
                 {editingAssignmentId ? "Save" : "Add Assignment"}
               </button>
               <button
                 type="button"
                 onClick={resetForm}
-                className="cancel-button"
+                className={styles.cancelButton}
               >
                 Cancel
               </button>

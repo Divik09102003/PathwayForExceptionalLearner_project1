@@ -4,7 +4,7 @@ import "@radix-ui/themes/styles.css";
 import type { Metadata } from "next";
 import { Roboto } from "next/font/google";
 import styles from "./layout.module.css";
-import "./main.css";
+import "./globals.css";
 
 const roboto = Roboto({ subsets: ["latin"], weight: ["400", "900"] });
 

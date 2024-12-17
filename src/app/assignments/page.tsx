@@ -11,6 +11,14 @@ import {
 } from "@radix-ui/themes";
 import Link from "next/link";
 import { getAssignments } from "../api/assignment/data";
+import {
+  Breadcrumb,
+  BreadcrumbItem,
+  BreadcrumbLink,
+  BreadcrumbList,
+  BreadcrumbPage,
+  BreadcrumbSeparator,
+} from "@/components/ui/breadcrumb";
 
 function AssignmentCard({ assignment }: { assignment: Assignment }) {
   return (
@@ -78,11 +86,25 @@ export default async function AssignmentListPage() {
   const assignments = await getAssignments();
 
   return (
-    <Container className="p-8">
-      <Heading as="h1" className="mb-4">
-        Assignment List
-      </Heading>
-      <AssignmentGroups assignments={assignments} />
-    </Container>
+    <>
+      {/* Breadcrumb */}
+      <Breadcrumb>
+        <BreadcrumbList>
+          <BreadcrumbItem>
+            <BreadcrumbLink href="/">Home</BreadcrumbLink>
+          </BreadcrumbItem>
+          <BreadcrumbSeparator />
+          <BreadcrumbItem>
+            <BreadcrumbPage>Assignments</BreadcrumbPage>
+          </BreadcrumbItem>
+        </BreadcrumbList>
+      </Breadcrumb>
+      <Container className="p-8">
+        <Heading as="h1" className="mb-4">
+          Assignment List
+        </Heading>
+        <AssignmentGroups assignments={assignments} />
+      </Container>
+    </>
   );
 }
