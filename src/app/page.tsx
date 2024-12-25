@@ -38,7 +38,7 @@ const Page: React.FC = () => {
   };
 
   return (
-    <div className="h-full flex justify-center items-center">
+    <div className="h-full flex justify-center items-center dark:bg-[#1F1F1F]">
       <section className="max-w-3xl flex flex-col gap-2 items-center">
         <Heading as="h1">Empower your assignment with AI</Heading>
         <p className="text-center">

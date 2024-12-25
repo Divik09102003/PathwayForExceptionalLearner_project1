@@ -296,7 +296,7 @@ export function AssignmentView({ assignment }: { assignment: Assignment }) {
     <>
       {/* Container 3: Student Writing and Feedback side by side */}
 
-      <PanelGroup direction="vertical" className="flex flex-grow flex-1">
+      <PanelGroup direction="vertical" className="flex flex-grow flex-1 dark:bg-[#1F1F1F]">
         {/* Left Panel: Student Writing */}
         <Panel>
           <PanelGroup direction="horizontal">
