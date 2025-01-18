@@ -1,7 +1,8 @@
-"use client"; // If you're using Next.js 13 app router, this ensures client-side rendering
+"use client"; // Ensures client-side rendering
 
-import React, { useState, FormEvent } from "react";
-import { GitHubLogoIcon, GearIcon, FileTextIcon  } from "@radix-ui/react-icons";
+import React, { useState, useEffect, FormEvent } from "react";
+import { GitHubLogoIcon, GearIcon, FileTextIcon, EnvelopeClosedIcon } from "@radix-ui/react-icons";
+
 const OnboardingPage: React.FC = () => {
   const [formData, setFormData] = useState({
     jobTitle: "",
@@ -9,36 +10,41 @@ const OnboardingPage: React.FC = () => {
     tonePreference: "formal",
   });
 
-  // Handle text/textarea/select changes
+  const [isGmailConnected, setIsGmailConnected] = useState(false);
+
+  // Check if redirected back with `gmailConnected=true`
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get("gmailConnected") === "true") {
+      setIsGmailConnected(true);
+    }
+  }, []);
+
+  const handleConnectGmail = () => {
+    window.location.href = "/api/auth"; // Redirect to backend OAuth route
+  };
+
   const handleChange = (
-    e: React.ChangeEvent<
-      HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement
-    >
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
   ) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
-  // Placeholder connect functions
   const handleConnectGithub = () => {
     alert("GitHub connection flow goes here.");
-    // Later: redirect to GitHub OAuth or token retrieval
   };
 
   const handleConnectERP = () => {
     alert("ERP connection flow goes here.");
-    // Placeholder logic for future integration
   };
 
   const handleConnectCMS = () => {
     alert("CMS connection flow goes here.");
-    // Placeholder logic for future integration
   };
 
-  // Handle form submit
   const handleSubmit = (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    // For now, just log. Later, you might send this data to your API/database
     console.log("Onboarding Form Data:", formData);
     alert("Form submitted! Check console for details.");
   };
@@ -47,13 +53,34 @@ const OnboardingPage: React.FC = () => {
     <div style={{ maxWidth: "600px", margin: "0 auto", padding: "2rem" }}>
       <h1>Onboarding Page</h1>
       <p>
-        Welcome! Connect your services and provide some details to help our AI
-        tools tailor summaries and communication tips for you.
+        Welcome! Connect your services and provide some details to help our AI tools tailor
+        summaries and communication tips for you.
       </p>
 
       {/* SECTION: Connect to external services */}
       <section style={{ marginBottom: "2rem" }}>
         <h2>Connect Your Services</h2>
+
+        {/* Gmail Button */}
+        <button
+          onClick={handleConnectGmail}
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            backgroundColor: isGmailConnected ? "green" : "red",
+            color: "white",
+            padding: "0.5rem 1rem",
+            border: "none",
+            borderRadius: "4px",
+            cursor: isGmailConnected ? "default" : "pointer",
+          }}
+          disabled={isGmailConnected} // Disable button if already connected
+        >
+          {isGmailConnected ? "Connected to Gmail" : "Connect Gmail"}
+          <span style={{ marginLeft: "0.5rem" }}>
+            <EnvelopeClosedIcon width={20} height={20} style={{ fill: "#fff" }} />
+          </span>
+        </button>
 
         {/* GitHub Button */}
         <button
@@ -116,15 +143,12 @@ const OnboardingPage: React.FC = () => {
         </button>
       </section>
 
-      {/* SECTION: Form to gather user info */}
+      {/* SECTION: Form */}
       <section>
         <h2>Provide Your Details</h2>
         <form onSubmit={handleSubmit}>
           <div style={{ marginBottom: "1rem" }}>
-            <label
-              htmlFor="jobTitle"
-              style={{ display: "block", marginBottom: "0.5rem" }}
-            >
+            <label htmlFor="jobTitle" style={{ display: "block", marginBottom: "0.5rem" }}>
               Job Title:
             </label>
             <input
