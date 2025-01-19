@@ -1,32 +1,51 @@
-// app/page.tsx
-
+// page.tsx
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { ChatOpenAI } from "@langchain/openai";
-import Image from "next/image";
+import { pdfToText } from 'pdf-ts';
+import dynamic from 'next/dynamic';
 
-// Mock message data
+// Dynamically import both `react-markdown` and `remark-gfm`
+const ReactMarkdownWithGfm = dynamic(async () => {
+  const [ReactMarkdown, remarkGfm] = await Promise.all([
+    import('react-markdown'),
+    import('remark-gfm'),
+  ]);
+
+  const MarkdownComponent = (props: any) => (
+    <ReactMarkdown.default {...props} remarkPlugins={[remarkGfm.default]} />
+  );
+  MarkdownComponent.displayName = 'MarkdownComponent';
+  return MarkdownComponent;
+}, { ssr: false });
+
 const initialMockMessages = {
   Inbox: [
     {
       id: 1,
-      subject: 'Text Email',
+      subject: 'Text Email (Markdown)',
       from: 'john@example.com',
       body: `
-        Hi Team,
-
-        I wanted to update you on the project status. We have completed the initial phase and are moving into development. Please ensure all documentation is up-to-date by end of this week.
-
-        Best,
-        John
-      `
+        
+      `,
     },
     {
       id: 2,
-      subject: 'Module 1 Tutorial Question (PDF)',
+      subject: 'Assessment Requirements',
       from: 'susan@example.com',
-      // Embed the PDF
+      body: (
+        <embed
+          src="/test-image.png"
+          type="image/png"
+          width="500"
+          height="400"
+        />
+      ),
+    },
+    {
+      id: 3,
+      subject: 'Module 1 Tutorial (PDF)',
+      from: 'alex@example.com',
       body: (
         <embed
           src="/Module1TutorialQuestion.pdf"
@@ -64,80 +83,93 @@ export default function HomePage() {
     setSummary('');
     setLoading(true);
 
-    // CASE 1: If the body is a string -> Summarize text via /api/summarize
-    if (typeof message.body === 'string') {
-      try {
-        console.log('Making request to /api/summarise...');
-        const res = await fetch('/api/summarise', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ emailContent: message.body }),
-        });
-        console.log('Response status:', res.status);
-        
-        if (!res.ok) {
-          throw new Error('Failed to fetch summary');
-        }
-        const data = await res.json();
-        console.log('Received data:', data);
-        setSummary(data.message);
-      } catch (error) {
-        console.error('Error in API call:', error);
-        setSummary('Error generating summary.');
-      }
+    try {
+      let textToSummarize = '';
 
-    // CASE 2: If the body is an <embed type="application/pdf"> -> call /api/pdftotext
-    } else if (
-      React.isValidElement(message.body) &&
-      message.body.type === 'embed' &&
-      message.body.props.type === 'application/pdf'
-    ) {
-      try {
-        const pdfSrc: string = message.body.props.src;
-        // Construct absolute URL if not fully qualified
-        const pdfUrl = pdfSrc.startsWith('http')
-          ? pdfSrc
-          : `${window.location.origin}${pdfSrc}`;
+      // Check if message body is a string (plaintext/markdown)
+      if (typeof message.body === 'string') {
+        textToSummarize = message.body;
 
-        const res = await fetch('/api/pdftotext', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ pdfUrl }),
-        });
+      // Otherwise, check if it's an <embed> element (PDF or image)
+      } else if (
+        React.isValidElement(message.body) &&
+        message.body.type === 'embed'
+      ) {
+        const src: string = message.body.props.src;
+        // Construct a fully qualified URL if needed
+        const srcUrl = src.startsWith('http') ? src : `${window.location.origin}${src}`;
 
-        if (!res.ok) {
-          const errorData = await res.json();
-          throw new Error(errorData.error || 'Failed to parse PDF');
-        }
+        // Handle PDF files
+        if (message.body.props.type === 'application/pdf') {
+          const response = await fetch(srcUrl);
+          if (!response.ok) {
+            throw new Error('Failed to fetch PDF file.');
+          }
+          const pdfArrayBuffer = await response.arrayBuffer();
+          const pdfUint8Array = new Uint8Array(pdfArrayBuffer);
+          textToSummarize = await pdfToText(pdfUint8Array);
 
-        const data = await res.json();
-
-        if (data.text && data.text.trim()) {
-          setSummary(data.text);
+        // Handle PNG/JPEG by converting to Base64
+        } else if (
+          message.body.props.type === 'image/png' ||
+          message.body.props.type === 'image/jpeg' ||
+          message.body.props.type === 'image/jpg'
+        ) {
+          // First fetch the image as a blob to avoid CORS issues
+          const response = await fetch(srcUrl);
+          if (!response.ok) {
+            throw new Error(`Failed to fetch image: ${response.statusText}`);
+          }
+          const imageBlob = await response.blob();
+          textToSummarize = await convertBlobToBase64(imageBlob);
         } else {
-          setSummary('No text found in the PDF (possibly a scanned document).');
+          setSummary('Unsupported content type.');
+          setLoading(false);
+          return;
         }
-      } catch (error: any) {
-        console.error('PDF parse error:', error);
-        setSummary(error.message || 'Error processing PDF.');
+      } else {
+        setSummary('Unsupported content type.');
+        setLoading(false);
+        return;
       }
 
-    } else {
-      setSummary('Unsupported content type.');
-    }
+      // Now we have the extracted text (PDF or Image), send it to our /api/summarise route
+      const res = await fetch('/api/summarise', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ emailContent: textToSummarize }),
+      });
 
-    setLoading(false);
+      if (!res.ok) {
+        throw new Error('Failed to fetch summary');
+      }
+
+      const data = await res.json();
+      setSummary(data.message);
+    } catch (error: any) {
+      console.error('Error processing message:', error);
+      setSummary(`Error: ${error.message}`);
+    } finally {
+      setLoading(false);
+    }
   };
+
+  async function convertBlobToBase64(blob: Blob): Promise<string> {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onloadend = () => resolve(reader.result as string);
+      reader.onerror = reject;
+      reader.readAsDataURL(blob);
+    });
+  }
 
   return (
     <div style={{ display: 'flex', height: '100vh', fontFamily: 'sans-serif' }}>
-      {/* Sidebar */}
       <aside
         style={{
           width: '250px',
           borderRight: '1px solid #ccc',
           padding: '1rem',
-          boxSizing: 'border-box',
         }}
       >
         <h2>Mail Folders</h2>
@@ -158,7 +190,6 @@ export default function HomePage() {
         </ul>
       </aside>
 
-      {/* Main Content */}
       <main style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
         <div style={{ flex: 1, display: 'flex' }}>
           <section
@@ -166,7 +197,6 @@ export default function HomePage() {
               width: '300px',
               borderRight: '1px solid #ccc',
               padding: '1rem',
-              boxSizing: 'border-box',
               overflowY: 'auto',
             }}
           >
@@ -193,7 +223,6 @@ export default function HomePage() {
               <p>Processing...</p>
             ) : selectedMessage ? (
               <>
-                {/* Show summary if present */}
                 {summary && (
                   <div
                     style={{
@@ -205,17 +234,19 @@ export default function HomePage() {
                     }}
                   >
                     <strong>Email Summary:</strong>
-                    <p style={{ whiteSpace: 'pre-wrap' }}>{summary}</p>
+                    <ReactMarkdownWithGfm>{summary}</ReactMarkdownWithGfm>
                   </div>
                 )}
+
                 <h2>{selectedMessage.subject}</h2>
                 <p><strong>From:</strong> {selectedMessage.from}</p>
                 <hr />
-                <div>
-                  {typeof selectedMessage.body === 'string'
-                    ? <p style={{ whiteSpace: 'pre-wrap' }}>{selectedMessage.body}</p>
-                    : selectedMessage.body}
-                </div>
+
+                {typeof selectedMessage.body === 'string' ? (
+                  <ReactMarkdownWithGfm>{selectedMessage.body}</ReactMarkdownWithGfm>
+                ) : (
+                  selectedMessage.body
+                )}
               </>
             ) : (
               <p>Select a message to read.</p>
@@ -226,5 +257,3 @@ export default function HomePage() {
     </div>
   );
 }
-
-
